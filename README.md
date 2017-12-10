@@ -1,5 +1,5 @@
-Run client: ./client hostname portnumber\n
-Run server: ./server portnumber\n
+Run client: ./client hostname portnumber
+Run server: ./server portnumber
 
 EXAMPLE:
 ./server 5000
