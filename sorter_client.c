@@ -1,12 +1,16 @@
-#include <stdio.h> 
+#include <stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<unistd.h> 
 #include <sys/types.h> 
 #include <sys/socket.h> 
 #include <netinet/in.h> 
 #include <netdb.h>
 
+
 void error(char * msg) {
         perror(msg);
-        return (0);
+        exit(1);
 }
 
 int main(int argc, char * argv[]) {
@@ -52,7 +56,7 @@ int main(int argc, char * argv[]) {
         serv_addr.sin_family = AF_INET;
 
 	//copy the bytesequency from src to destination 
-        bcopy((char * ) server - > h_addr, (char * ) & serv_addr.sin_addr.s_addr, server - > h_length);
+        bcopy((char * ) server -> h_addr, (char * ) & serv_addr.sin_addr.s_addr, server -> h_length);
 
 	//assign portno
         serv_addr.sin_port = htons(portno);

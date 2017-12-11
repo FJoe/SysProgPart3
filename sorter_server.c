@@ -1,25 +1,25 @@
 /* A simple server in the internet domain using TCP the port number is passed as an argument */
 
-#include<stdio.h>
-#include<sys/types.h>
-#include<sys/socket.h>
-#include<netinet/in.h>
+#include"sorter_server.h"
 
 void error(char *msg){
 	perror(msg);
-	return(1);
+	exit(1);
 }
 
 int main(int argc, char *argv[]){
-
 	int sockfd, newsockfd, portno, clilen;
 	char buffer[256];
 	struct sockaddr_in serv_addr, cli_addr;
 	int n;
 
 	//check for proper args
-	if (argc < 2){
-		fprintf(stderr,"ERROR, no port provided\n");
+	if (argc < 3){
+		fprintf(stderr,"ERROR, no -p parameter or port provided\n");
+		return(1);
+	}
+	if(strcmp(argv[1], "-p") != 0){
+		fprintf(stderr,"ERROR, no -p parameter given\n");
 		return(1);
 	}
 
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]){
 	bzero((char *) &serv_addr, sizeof(serv_addr));
 
 	//set portnumber to user given. Server and client portno must match
-	portno = atoi(argv[1]);
+	portno = atoi(argv[2]);
 
 	/*setup the host_addr structure for bind call*/
 	//server byte order, IPv4
@@ -48,10 +48,10 @@ int main(int argc, char *argv[]){
 	//convert integer value to network order	
 	serv_addr.sin_port = htons(portno);
 
-	// bind(int fd, struct sockaddr *local_addr, socklen_t addr_length)
-     // bind() passes file descriptor, the address structure, 
-     // and the length of the address structure
-     // This bind() call will bind  the socket to the current IP address on port, portno
+	// bind(int fd, struct sockaddr *local_addr, socklen_t addr_
+	// bind() passes file descriptor, the address 
+	// and the length of the address 
+	// This bind() call will bind  the socket to the current IP address on port, portno
      
 	if (bind(sockfd, (struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0){
 		error("ERROR on binding");

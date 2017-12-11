@@ -5,18 +5,20 @@
 *
 *
 ******/
+#include<dirent.h>
+#include<netdb.h>
+#include<netinet/in.h>
+#include<pthread.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<sys/types.h>
+#include<sys/socket.h>
+#include<sys/wait.h>
+#include<unistd.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <dirent.h>
-#include <pthread.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-#ifndef SORTER_THREAD_H
-#define SORTER_THREAD_H
+#ifndef SORTER_SERVER_H
+#define SORTER_SERVER_H
 
 //data to compare each row by. Either comparing data of string or numeric values
 union data_compare{
@@ -60,7 +62,8 @@ struct csvFile_arg_struct{
 	int* counter;
 };
 
-
+//Print error and exit
+void error(char *msg);
 
 //Gets pointer to array of file pointers of type csv files. Also traverses through any directories inside dir
 void sortcsvFiles(char* dir, char* outputDir, char* colToSort, int* counter);

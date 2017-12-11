@@ -1,4 +1,4 @@
-PROGRAMS = sorter_thread
+PROGRAMS = sorter_client
 
 CC = gcc
 CFLAGS = -Wall -pthread
