@@ -60,9 +60,9 @@ int main(int argc, char *argv[]){
 	// This listen() call tells the socket to listen to the incoming connections.
      	// The listen() function places all incoming connection into a backlog queue
      	// until accept() call accepts the connection.
-     	// Here, we set the maximum size for the backlog queue to 5.
-	//TODO: Change value of backlog
-	listen(sockfd,5);
+     	// Here, we set the maximum size for the backlog queue to 32.
+	// Backlog queue shouldn't grow to a large size.
+	listen(sockfd,32);
 	clilen = sizeof(cli_addr);
 
 	// This accept() function will write the connecting client's address info 
@@ -71,6 +71,8 @@ int main(int argc, char *argv[]){
      	// So, the original socket file descriptor can continue to be used 
      	// for accepting new connections while the new socker file descriptor is used for
      	// communicating with the connected client.
+	// TODO: Do threading here.
+	// If multiple client wants to connect, the server replaces old client with new client and sends back an error
 	newsockfd = accept(sockfd,(struct sockaddr *) &cli_addr, &clilen);
 
 	if (newsockfd < 0){
