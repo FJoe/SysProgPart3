@@ -1,11 +1,25 @@
 #include <stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+
+
+void* threadDir(void* parameters);
+void* threadFile(void* parameters);
+void recursiveSearch(char* dir);
+int ti = 0;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_t * tarr;
+
+typedef struct params{
+    char objectname[500];
+}params;
 
 void error(char * msg) {
     perror(msg);
@@ -42,6 +56,30 @@ char headers[28][50] = {
     "movie_facebook_likes"
 };
 
+void* threadFile(void* parameters){
+    params *input = (params*)parameters;
+    char *fill = (char*)malloc(sizeof(char*)*500);
+    strcpy(fill, input->objectname);
+    //printf("SORTING CSV:%s\n",input->filename);
+    //printf("SORTING CSV COLNAME:%s\n",input->colname);
+    free(fill);
+    //free(coll);
+    //free(outt);
+    //printf("Row#:%d\n",rownum);
+    pthread_exit(NULL);
+}
+
+void* threadDir(void* parameters){
+    params *input = (params*)parameters;
+    char *dirn = (char*)malloc(sizeof(char*)*500);
+    printf("dirname: %s\n", input->objectname);
+    strcpy(dirn, input->objectname);
+    // printf("RECURSIVE DIR:%s\n",dirn);
+    recursiveSearch(dirn);
+    
+    free(dirn);
+    pthread_exit(NULL);
+}
 
 int iscolumn(char* col){
     int j;
@@ -52,6 +90,58 @@ int iscolumn(char* col){
     }
     return -1;
     
+}
+
+void recursiveSearch(char* dir){
+    //printf("%s is dir name\n", dir);
+    DIR * dp = opendir(dir);
+    
+    if(!dp){
+        printf("\nNot a directory!\n");
+        printf("\n%s\n",dir);
+        exit(0);
+    }
+    struct dirent * ptr;
+    while((ptr = readdir(dp))){
+        if(ptr->d_type == DT_REG){
+            /////// CHECK IF ITS NOT SORTED -- this causes infinite recursion
+            if(strcmp(&(ptr->d_name[strlen(ptr->d_name)-4]), ".csv") == 0 && !strstr(ptr->d_name, "sorted")){
+                char * new_name;
+                new_name = (char *)malloc(strlen(dir)+strlen(ptr->d_name)+2);
+                strcpy(new_name, dir);
+                strcat(new_name, "/");
+                strcat(new_name, ptr->d_name);
+                strcat(new_name, "\0");
+                
+                params *temp = malloc(sizeof(params));
+                strcpy(temp->objectname, new_name);
+                printf("New CSV Thread! dir = %s\n", new_name);
+                pthread_create(&tarr[ti], NULL, threadFile, temp);
+                ti+=1;
+            }
+        }else if (ptr->d_type == DT_DIR) {
+            if(strcmp(ptr->d_name, ".") && strcmp(ptr->d_name, "..")){
+                //printf("%s is a directory\n", ptr->d_name);
+                char * new_dir;
+                int status;
+                printf("\nCurrent dir: %s\n", dir);
+                new_dir = (char *)malloc(strlen(dir)+strlen(ptr->d_name)+2);
+                strcpy(new_dir, dir);
+                strcat(new_dir, "/");
+                strcat(new_dir, ptr->d_name);
+                strcat(new_dir, "\0");
+                params *temp = malloc(sizeof(params));
+                strcpy(temp->objectname, new_dir);
+                //-------------------------------------------call to thread-----
+                //printf("RECURSING CSV BEFORE:%s\n",temp2->dirname);
+                printf("New DIR Thread! dir = %s\n", new_dir);
+                pthread_create(&tarr[ti], NULL, threadDir, temp);
+                free(new_dir);
+                ti+=1;
+            }
+        }
+    }
+    return;
 }
 
 int main(int argc, char * argv[]) {
@@ -125,6 +215,10 @@ int main(int argc, char * argv[]) {
     //set portno. to specified between 2000 and 65655(?)
     portno = atoi(argv[2]);
     
+    //tests if portno is valid
+    if(portno < 2000 || portno > 65655){
+        error("Port number must be between 2000 and 65655!");
+    }
     //create a socket(int domain, int type, int protocol)
     //domain is IPv4
     //type is TCP
