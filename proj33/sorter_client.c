@@ -8,8 +8,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <sys/sendfile.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-
+int port;
+char * hostname;
 void* threadDir(void* parameters);
 void* threadFile(void* parameters);
 void recursiveSearch(char* dir);
@@ -62,6 +67,8 @@ void* threadFile(void* parameters){
     strcpy(fill, input->objectname);
     //printf("SORTING CSV:%s\n",input->filename);
     //printf("SORTING CSV COLNAME:%s\n",input->colname);
+    //TODO: Connect to server, send file
+    //sendCSV(fill);
     free(fill);
     //free(coll);
     //free(outt);
@@ -74,9 +81,8 @@ void* threadDir(void* parameters){
     char *dirn = (char*)malloc(sizeof(char*)*500);
     printf("dirname: %s\n", input->objectname);
     strcpy(dirn, input->objectname);
-    // printf("RECURSIVE DIR:%s\n",dirn);
+    printf("RECURSIVE DIR:%s\n",dirn);
     recursiveSearch(dirn);
-    
     free(dirn);
     pthread_exit(NULL);
 }
@@ -93,7 +99,7 @@ int iscolumn(char* col){
 }
 
 void recursiveSearch(char* dir){
-    //printf("%s is dir name\n", dir);
+    printf("%s is dir name\n", dir);
     DIR * dp = opendir(dir);
     
     if(!dp){
@@ -101,6 +107,7 @@ void recursiveSearch(char* dir){
         printf("\n%s\n",dir);
         exit(0);
     }
+    
     struct dirent * ptr;
     while((ptr = readdir(dp))){
         if(ptr->d_type == DT_REG){
@@ -145,19 +152,17 @@ void recursiveSearch(char* dir){
 }
 
 int main(int argc, char * argv[]) {
-    int sockfd, portno, n;
+    int sockfd, n;
     struct sockaddr_in serv_addr;
     struct hostent * server;
     char input[250];
     char output[250];
     char col[250];
-    int port;
-    char * hostname;
-    
     char buffer[256];
+    tarr = (pthread_t *)malloc(sizeof(pthread_t)*8000);
     
     //Check to see args numbers are correct
-    if(argc > 2 && argc < 10){
+    if(argc > 2 && argc < 11){
         // look at the column name
         if(strcmp(argv[1],"-c") == 0){
             if(iscolumn(argv[2]) >= 0){
@@ -176,7 +181,7 @@ int main(int argc, char * argv[]) {
             hostname = (char *)malloc(sizeof(argv[4]));
             strcpy(hostname, argv[4]);
             port = atoi(argv[6]);
-            if(argc >7 && argc < 11){
+            if(argc >9 && argc < 11){
                 if(strcmp(argv[7],"-d") == 0){
                     strcpy(input, argv[8]);
                 }
@@ -184,7 +189,7 @@ int main(int argc, char * argv[]) {
                     strcpy(output, argv[10]);
                 }
             }
-            else if(argc >7 && argc < 9){
+            else if(argc >7 && argc < 10){
                 if(strcmp(argv[7],"-d") == 0){
                     strcpy(input, argv[8]);
                     strcpy(output, ".");
@@ -197,83 +202,90 @@ int main(int argc, char * argv[]) {
                 strcpy(input, ".");
                 strcpy(output, ".");
             }
-            
-            
-            
         }
         else{
             printf("No column flag");
             return 0;
         }
-        
     }else{
         printf("Improper number of arguments!");
         return 0;
     }
     
-    
-    //set portno. to specified between 2000 and 65655(?)
-    portno = atoi(argv[2]);
-    
-    //tests if portno is valid
-    if(portno < 2000 || portno > 65655){
+    //tests if port is valid
+    if(port < 2000 || port > 65655){
         error("Port number must be between 2000 and 65655!");
     }
-    //create a socket(int domain, int type, int protocol)
-    //domain is IPv4
-    //type is TCP
-    //protocol is 0 for default
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
     
-    //check to see socket was correctly opened
-    if (sockfd < 0) {
-        error("ERROR opening socekt");
+    recursiveSearch(input);
+    int i;
+    for(i=0; i<ti; i++) {
+        //printf("-------------------B\n");
+        if(tarr[i] > 0){
+            pthread_join(tarr[i],NULL);
+            //printf("%lu, ", tarr[i]);
+        }
+        //printf("-------------------E\n");
+    }
+}
+
+int sendCSV(char * filename)
+{
+    int sd;
+    int rn;
+    struct sockaddr_in client,server;
+    struct hostent *h;
+    int fq;
+    int i;
+    char ch;
+    struct stat st;
+    int len = 0;
+    
+    sd=socket(AF_INET,SOCK_STREAM,0);
+    if(sd < 0)
+    {
+        printf( "Creating socket error!\n ");
+        exit(1);
     }
     
-    //host name: "visitor.cs.rutgers.edu" = "visitor"
-    server = gethostbyname(argv[1]);
-    
-    //check if hostname exists
-    if (server == NULL) {
-        fprintf(stderr, "Error, no such host");
-        return (0);
+    h=gethostbyname(hostname);
+    if(h == NULL)
+    {
+        printf( "Can't get hostname ");
+        exit(1);
     }
     
-    //clears the memory and initializes to 0s
-    bzero((char * ) & serv_addr, sizeof(serv_addr));
+    bzero(&server,sizeof(server));
+    server.sin_family=h-> h_addrtype;
+    server.sin_port=htons(port);
+    server.sin_addr = *((struct in_addr *)h-> h_addr);
     
-    //set domain
-    serv_addr.sin_family = AF_INET;
+    int opt=1;
+    setsockopt(sd,SOL_SOCKET,SO_REUSEADDR,&opt,sizeof(opt));
     
-    //copy the bytesequency from src to destination
-    bcopy((char * ) server -> h_addr, (char * ) & serv_addr.sin_addr.s_addr, server -> h_length);
-    
-    //assign portno
-    serv_addr.sin_port = htons(portno);
-    
-    if (connect(sockfd, & serv_addr, sizeof(serv_addr)) < 0) {
-        error("ERROR connecting");
+    if(connect(sd,(struct sockaddr *)&server,sizeof(server)) < 0)
+    {
+        printf( "Connect Error!\n ");
+        exit(1);
     }
     
-    printf("Please enter the message: ");
-    bzero(buffer, 256);
-    fgets(buffer, 255, stdin);
-    
-    //send message to server, not using send(...)
-    n = write(sockfd, buffer, strlen(buffer));
-    if (n < 0) {
-        error("ERROR writing to socket");
+    fq = open(filename , O_RDONLY);
+    if( fq < 0 )
+    {
+        perror("file error");
+        exit(1);
     }
     
-    //clean the string
-    bzero(buffer, 256);
+    stat(filename,&st);
+    len = st.st_size;
     
-    //read response of the server
-    n = read(sockfd, buffer, 255);
-    if (n < 0) {
-        error("ERROR reading from socket");
+    if(sendfile(sd,fq,0,len) < 0)
+    {
+        perror("send error");
+        exit(1);
     }
-    printf("%s\n", buffer);
     
+    close(sd);
+    close(fq);
     return 0;
 }
