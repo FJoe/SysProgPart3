@@ -77,24 +77,30 @@ int main(int argc, char *argv[]){
 		error("ERROR on accept");
 	}
 
-	//clear buffer
-	bzero(buffer,256);
 
-	//read the message inside the socket sent from client
-	n = read(newsockfd,buffer,255);
+	do{
+		//clear buffer
+		bzero(buffer,256);
 
-	if (n < 0){
-		error("ERROR reading from socket");
-	}
+		//read the message inside the socket sent from client
+		n = recv(newsockfd,buffer,255,0);
 
-	printf("Here is the message: %s\n",buffer);
+		if (n < 0){
+			error("ERROR reading from socket");
+		}
 
-	//send back the message to client
-	n = write(newsockfd,"I got your message",18);
+		printf("Here is the message: %s\n",buffer);
 
-	if (n < 0){
-		error("ERROR writing to socket");
-	}
+		//send back the message to client
+		n = write(newsockfd,"I got your message",18);
+
+		if (n < 0){
+			error("ERROR writing to socket");
+		}
+	}while(strstr(buffer, "EOF") == NULL);
+
+
+	
 
 	return 0;
 }
