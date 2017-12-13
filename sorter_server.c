@@ -91,7 +91,7 @@ int main(int argc, char *argv[]){
 			error("ERROR reading from socket");
 		}
 
-		printf("Here is the message: %s\n",buffer);
+		printf("Here is the message: %s",buffer);
 
 		//send back the message to client
 		n = write(newsockfd,"I got your message",18);
