@@ -227,6 +227,9 @@ int main(int argc, char * argv[]) {
         }
         //printf("-------------------E\n");
     }
+    // Send Server ~/EOS
+    // Wait/ read
+    // Create Final
 }
 
 int sendCSV(char * filename)
@@ -277,13 +280,15 @@ int sendCSV(char * filename)
     }
     
     stat(filename,&st);
+    //
     len = st.st_size;
-    
+    /// -----https://stackoverflow.com/questions/20235843/how-to-receive-a-file-using-sendfile
+    // Do 1)
     if(sendfile(sd,fq,0,len) < 0)
     {
         perror("send error");
         exit(1);
-    }
+    }	
     
     close(sd);
     close(fq);
