@@ -79,27 +79,44 @@ int main(int argc, char *argv[]){
 		error("ERROR on accept");
 	}
 
+	char* end;
 
 	do{
 		//clear buffer
 		bzero(buffer,256);
 
+		char sizeString[256];
+
+		n = recv(newsockfd, sizeString, 10, 0);
+		if (n < 0){
+			error("ERROR reading from socket");
+		}
+
+		//get size and convert to int. Make char array of this size
+		int size = atoi(sizeString);	
+		char words[size];
+		bzero(words,256);
+
 		//read the message inside the socket sent from client
-		n = recv(newsockfd,buffer,255,0);
+		n = read(newsockfd,words,size);
 
 		if (n < 0){
 			error("ERROR reading from socket");
 		}
 
-		printf("Here is the message: %s",buffer);
+		printf("Size of message: %d\n", size);
+
+		printf("Here is the message: %s",words);
 
 		//send back the message to client
 		n = write(newsockfd,"I got your message",18);
 
+		end = words;
+
 		if (n < 0){
 			error("ERROR writing to socket");
 		}
-	}while(strstr(buffer, "EOF") == NULL);
+	}while(strstr(end, "EOF") == NULL);
 
 
 	

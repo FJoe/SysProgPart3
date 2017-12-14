@@ -1,11 +1,16 @@
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
 #include <stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<unistd.h> 
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h> 
 #include <sys/types.h> 
 #include <sys/socket.h> 
 #include <netinet/in.h> 
 #include <netdb.h>
+
 
 
 void error(char * msg) {
@@ -67,17 +72,46 @@ int main(int argc, char * argv[]) {
 	
 	int cont;
 	do{
-		printf("Please enter the message: ");
-		bzero(buffer, 256);
-		fgets(buffer, 255, stdin);
+		char fileName[100];
+    		struct stat st;
+
+		printf("Please enter csv file location: ");
+		bzero(fileName, 256);
+		fgets(fileName, 255, stdin);
+
+		int i;
+		for(i = 0; i < 100; i++)
+			if(fileName[i] == '\n')
+				fileName[i] = '\0';
+
+		printf("%s", fileName);
+		
+		int fq = open(fileName, O_RDONLY);
+		if( fq < 0 )
+		{
+			perror("File error");
+			exit(1);
+		}
+    
+		stat(fileName,&st);
+		int len = st.st_size;
+
+		char bufferSize[10];
+		sprintf(bufferSize, "%d", len);
 
 		//send message to server, not using send(...) 
-		n = write(sockfd, buffer, strlen(buffer));
-		if (n < 0) {
-		        error("ERROR writing to socket");
+		n = write(sockfd, bufferSize, 10);
+		if(n < 0){
+			error("ERROR writing to socket");
 		}
 
-		cont = (strstr(buffer, "EOF") == NULL);
+		if(sendfile(sockfd,fq,0,len) < 0)
+		{
+			perror("send error");
+			exit(1);
+		}
+
+		cont = 1;
 
 		//clean the string
 		bzero(buffer, 256);
