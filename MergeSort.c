@@ -1,4 +1,4 @@
-#include "sorter_thread.h"
+#include "sorter_server.h"
 
 /*
 	The merge function puts the data of 2 temporary arrays back into the main array
