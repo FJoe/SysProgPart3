@@ -62,13 +62,14 @@ char headers[28][50] = {
 };
 
 void* threadFile(void* parameters){
+   // printf( "<><><><>HERE<><><><>");
     params *input = (params*)parameters;
     char *fill = (char*)malloc(sizeof(char*)*500);
     strcpy(fill, input->objectname);
     //printf("SORTING CSV:%s\n",input->filename);
     //printf("SORTING CSV COLNAME:%s\n",input->colname);
     //TODO: Connect to server, send file
-    //sendCSV(fill);
+    sendCSV(fill);
     free(fill);
     //free(coll);
     //free(outt);
@@ -79,9 +80,9 @@ void* threadFile(void* parameters){
 void* threadDir(void* parameters){
     params *input = (params*)parameters;
     char *dirn = (char*)malloc(sizeof(char*)*500);
-    printf("dirname: %s\n", input->objectname);
+    //printf("dirname: %s\n", input->objectname);
     strcpy(dirn, input->objectname);
-    printf("RECURSIVE DIR:%s\n",dirn);
+    //printf("RECURSIVE DIR:%s\n",dirn);
     recursiveSearch(dirn);
     free(dirn);
     pthread_exit(NULL);
@@ -131,7 +132,7 @@ void recursiveSearch(char* dir){
                 //printf("%s is a directory\n", ptr->d_name);
                 char * new_dir;
                 int status;
-                printf("\nCurrent dir: %s\n", dir);
+                //printf("\nCurrent dir: %s\n", dir);
                 new_dir = (char *)malloc(strlen(dir)+strlen(ptr->d_name)+2);
                 strcpy(new_dir, dir);
                 strcat(new_dir, "/");
@@ -141,7 +142,7 @@ void recursiveSearch(char* dir){
                 strcpy(temp->objectname, new_dir);
                 //-------------------------------------------call to thread-----
                 //printf("RECURSING CSV BEFORE:%s\n",temp2->dirname);
-                printf("New DIR Thread! dir = %s\n", new_dir);
+                //printf("New DIR Thread! dir = %s\n", new_dir);
                 pthread_create(&tarr[ti], NULL, threadDir, temp);
                 free(new_dir);
                 ti+=1;
@@ -227,6 +228,7 @@ int main(int argc, char * argv[]) {
         }
         //printf("-------------------E\n");
     }
+    printf("----%d----",ti);
     // Send Server ~/EOS
     // Wait/ read
     // Create Final
@@ -234,15 +236,18 @@ int main(int argc, char * argv[]) {
 
 int sendCSV(char * filename)
 {
+    //printf( "---HERE----");
     int sd;
     int rn;
     struct sockaddr_in client,server;
     struct hostent *h;
     int fq;
+    int n;
     int i;
     char ch;
     struct stat st;
     int len = 0;
+    char buffer[256];
     
     sd=socket(AF_INET,SOCK_STREAM,0);
     if(sd < 0)
@@ -282,15 +287,30 @@ int sendCSV(char * filename)
     stat(filename,&st);
     //
     len = st.st_size;
-    /// -----https://stackoverflow.com/questions/20235843/how-to-receive-a-file-using-sendfile
-    // Do 1)
+    char bufferSize[10];
+    sprintf(bufferSize, "%d", len);
+    //printf("len is:%d", len);
+    n = write(sd, bufferSize, 10);
+    if(n < 0){
+        error("ERROR writing to socket");
+    }
+
     if(sendfile(sd,fq,0,len) < 0)
     {
         perror("send error");
         exit(1);
-    }	
+    }
+    bzero(buffer, 256);
     
+    n = read(sd, buffer, 255);
+    if (n < 0) {
+        error("ERROR reading from socket");
+    }
+    //write(sd,"35",225);
+    //printf( "Sent m\n ");
+    printf("%s\n", buffer);
     close(sd);
     close(fq);
     return 0;
 }
+
