@@ -9,6 +9,8 @@ int* csvCounter;
 int* counter;
 DataRow*** masterList;
 char* header;
+pthread_t * threadPool;
+int threadCounter;
 
 void error(char *msg){
 	perror(msg);
@@ -113,7 +115,7 @@ int getColNum(char* header, char* colToSort){
 
 void *sortIndiv(void* arg){
 	const char delim[2] = ",";
-	const char delimRow[2] = "\0";
+	const char delimRow[3] = "\n";
 	const char otherDelim[3] = "\"";
 
 	//Gets arguments
@@ -159,6 +161,7 @@ void *sortIndiv(void* arg){
 		int i = 0;
 
 		while(curWord != NULL){
+			printf("sortIndiv: %s\n", curWord);
 			if(firstWord)
 				firstWord = 0;
 			else
@@ -204,7 +207,7 @@ void *sortIndiv(void* arg){
 	}
 
 	//Sort list
-	mergeSort(list, 0, (curRowNum -1));
+	//mergeSort(list, 0, (curRowNum -1));
 
 	//Ensure no other thread accesses the masterList or csvCounter
 	pthread_mutex_lock(&csv_mutex);
@@ -219,12 +222,137 @@ void *sortIndiv(void* arg){
 	return NULL;
 }
 
+void * connectionHandler(void *socket){
+	int newsockfd = *(int *) socket;
+	
+	//Get col to sort by through 
+	char colToSort[30];
+	int n;
+
+	n = recv(newsockfd, colToSort, 20, 0);
+	if (n < 0){
+		error("ERROR reading from socket");
+	}
+
+	printf("col to sort: %s\n", colToSort);
+
+	char sizeString[100];;
+
+	n = recv(newsockfd, sizeString, 100, 0);
+	if (n < 0){
+		error("ERROR reading from socket");
+	}
+
+	printf("size of string: %s\n", sizeString);
+
+	//If EOF initiated
+	if(strstr(sizeString, "/EOF~") != NULL){
+
+		//wait for all threads to finish
+		for(; threadCounter >= 0; threadCounter--){
+			pthread_join(threadPool[threadCounter], NULL);
+		}
+
+		//When EOF is initiated by client and there are some csv entries given		
+		if(masterList[0] != NULL){
+			//Create file for sorted csv
+			char* fileName = (char*)malloc(sizeof("AllFiles-sorted-.csv") + sizeof(fileName) + sizeof(colToSort) + 1);
+			strcat(fileName, "AllFiles-sorted-");
+			strcat(fileName, colToSort);
+			strcat(fileName, ".csv");
+			
+			FILE* outfp;
+			outfp = fopen(fileName, "w");
+	
+			//Print header for file
+			fprintf(outfp, header);
+	
+			//Place all data into new list then sort
+			DataRow** sortedList = (DataRow**) malloc(sizeof(DataRow*) * 1000000);
+	
+			int cur = 0;
+			int i = 0;
+			while(masterList[i] != NULL){
+				DataRow** curList = masterList[i];
+				int j = 0;
+				while(curList[j] != NULL){
+					sortedList[cur] = curList[j];
+					j++;
+					cur++;
+				}
+				free(curList);
+				i++;
+			}
+			mergeSort(sortedList, 0, (cur - 1));
+	
+			//Prints sorted list to output file then frees data
+			i = 0;
+			while(sortedList[i] != NULL){
+				fprintf(outfp, sortedList[i]->data);
+	
+				free(sortedList[i]->dataCompare);
+				free(sortedList[i]->data);
+				free(sortedList[i]);
+				i++;
+			}
+			free(sortedList);
+		}
+		else{
+			printf("\nNo valid csv file was found\n");
+		}
+	}
+	else{
+		//get size and convert to int. Make char array of this size
+		int size = atoi(sizeString);
+
+		printf("sizenumber: %d\n", size);	
+		char words[size];
+		bzero(words, size);
+
+		//read the message inside the socket sent from client
+		n = recv(newsockfd, words, size, 0);
+
+		if (n < 0){
+			error("ERROR reading from socket");
+		}
+	
+		printf("file: %s\n", words);
+
+		struct sort_arg_struct args;
+		args.file = words;
+		args.colToSort = colToSort;
+
+		sortIndiv((void *) &args);
+
+		pthread_mutex_unlock(&csv_mutex);
+
+		//send back the message to client
+		n = write(newsockfd,"I got your message",18);
+
+		if (n < 0){
+			error("ERROR writing to socket");
+		}
+	}
+
+	return NULL;
+}
+
 
 
 int main(int argc, char *argv[]){
 	int sockfd, newsockfd, portno;
 	struct sockaddr_in serv_addr, cli_addr;
-	int n;
+	
+	//Initiate pthread_mutex
+	pthread_mutex_init(&counter_mutex, 0);
+	pthread_mutex_init(&csv_mutex, 0);
+
+	//Create masterList of data and csvCounter
+	masterList = (DataRow***) malloc(sizeof(DataRow**) * 1500);
+	csvCounter = (int*) malloc(sizeof(int) * 1);
+
+	//initialize thread pool to 2048 threads
+	threadPool = (pthread_t *) malloc(sizeof(pthread_t) * 2048);
 
 	//check for proper args
 	if (argc < 3){
@@ -285,132 +413,28 @@ int main(int argc, char *argv[]){
      	// for accepting new connections while the new socker file descriptor is used for
      	// communicating with the connected client.
 	// If multiple client wants to connect, the server replaces old client with new client and sends back an error
-	newsockfd = accept(sockfd,(struct sockaddr *) &cli_addr, &clilen);
-
-	if (newsockfd < 0){
-		error("ERROR on accept");
-	}
-
-	//Get col to sort by through 
-	char colToSort[30];
-	n = recv(newsockfd, colToSort, 20, 0);
-	if (n < 0){
-		error("ERROR reading from socket");
-	}
-
-	//Initiate pthread_mutex
-	pthread_mutex_init(&counter_mutex, 0);
-	pthread_mutex_init(&csv_mutex, 0);
-
-	//Create masterList of data and csvCounter
-	masterList = (DataRow***) malloc(sizeof(DataRow**) * 1500);
-	csvCounter = (int*) malloc(sizeof(int) * 1);
-
-	//Create list of threads made for each csv file
-	ThreadNode* firstNode = NULL;
-	ThreadNode* lastNode = NULL;
-	int threadCounter = 0;
-
-	int cont = 1;
-	int prevSize = 0;
-	while(cont){
-		char sizeString[256];
-
-		n = recv(newsockfd, sizeString, 10, 0);
-		if (n < 0){
-			error("ERROR reading from socket");
-		}
-
-		//If EOF initiated
-		if(strstr(sizeString, "/EOF~") != NULL)
-			//WAIT FOR ALL THREADS TO FINISH
-			cont = 0;
-		else{
-			//get size and convert to int. Make char array of this size
-			int size = atoi(sizeString);	
-			char words[size];
-			bzero(words,prevSize * 16);
-			prevSize = size;
-
-			//read the message inside the socket sent from client
-			n = read(newsockfd,words,size);
-
-			if (n < 0){
-				error("ERROR reading from socket");
-			}
-
-			//SEND WORDS TO NEW THREAD TO SORT THROUGH
-			struct sort_arg_struct args;
-			args.file = words;
-			args.colToSort = colToSort;
-
-
-			//send back the message to client
-			n = write(newsockfd,"I got your message",18);
-
-			if (n < 0){
-				error("ERROR writing to socket");
-			}
-		}
-
-
-	}
-
-	//Join all of this thread's children and free the nodes
-	while(firstNode != NULL){
-		pthread_join(*(firstNode->thread), 0);
-		ThreadNode* prev = firstNode;
-		firstNode = firstNode->nextNode;
-		free(prev);
-	}
-
-
-	//When EOF is initiated by client and there are some csv entries given
-	if(masterList[0] != NULL){
-		//Create file for sorted csv
-		char* fileName = (char*)malloc(sizeof("AllFiles-sorted-.csv") + sizeof(fileName) + sizeof(colToSort) + 1);
-		strcat(fileName, "AllFiles-sorted-");
-		strcat(fileName, colToSort);
-		strcat(fileName, ".csv");
 	
-		FILE* outfp;
-		outfp = fopen(fileName, "w");
+	//TODO: START THREAD HERE
+	//connect to the client request
+	
+	threadCounter = 0;	
+	while((newsockfd = accept(sockfd,(struct sockaddr *) &cli_addr, &clilen))){
 
-		//Print header for file
-		fprintf(outfp, header);
-
-		//Place all data into new list then sort
-		DataRow** sortedList = (DataRow**) malloc(sizeof(DataRow*) * 1000000);
-
-		int cur = 0;
-		int i = 0;
-		while(masterList[i] != NULL){
-			DataRow** curList = masterList[i];
-			int j = 0;
-			while(curList[j] != NULL){
-				sortedList[cur] = curList[j];
-				j++;
-				cur++;
-			}
-			free(curList);
-			i++;
+		printf("accepted\n");
+		if (newsockfd < 0){
+			error("ERROR on accept");
 		}
-		mergeSort(sortedList, 0, (cur - 1));
 
-		//Prints sorted list to output file then frees data
-		i = 0;
-		while(sortedList[i] != NULL){
-			fprintf(outfp, sortedList[i]->data);
+		pthread_t thread_id;
+		if(pthread_create(&thread_id, NULL, &connectionHandler , (void *) &newsockfd) < 0){
+			error("error creating thread");
+		}	
 
-			free(sortedList[i]->dataCompare);
-			free(sortedList[i]->data);
-			free(sortedList[i]);
-			i++;
-		}
-		free(sortedList);
-	}
-	else{
-		printf("\nNo valid csv file was found\n");
-	}
+		threadPool[threadCounter++] = thread_id;
+	}	
+
+
+
+	free(threadPool);
 	return 0;
 }
