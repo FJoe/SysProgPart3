@@ -223,7 +223,6 @@ void *sortIndiv(void* arg){
 
 int main(int argc, char *argv[]){
 	int sockfd, newsockfd, portno;
-	char buffer[256];
 	struct sockaddr_in serv_addr, cli_addr;
 	int n;
 
@@ -292,6 +291,13 @@ int main(int argc, char *argv[]){
 		error("ERROR on accept");
 	}
 
+	//Get col to sort by through 
+	char colToSort[30];
+	n = recv(newsockfd, colToSort, 20, 0);
+	if (n < 0){
+		error("ERROR reading from socket");
+	}
+
 	//Initiate pthread_mutex
 	pthread_mutex_init(&counter_mutex, 0);
 	pthread_mutex_init(&csv_mutex, 0);
@@ -305,23 +311,9 @@ int main(int argc, char *argv[]){
 	ThreadNode* lastNode = NULL;
 	int threadCounter = 0;
 
-
-
-
-
-	//Get col to sort by
-	char* colToSort;
-
-
-
-
-
-
 	int cont = 1;
+	int prevSize = 0;
 	while(cont){
-		//clear buffer
-		bzero(buffer,256);
-
 		char sizeString[256];
 
 		n = recv(newsockfd, sizeString, 10, 0);
@@ -337,7 +329,8 @@ int main(int argc, char *argv[]){
 			//get size and convert to int. Make char array of this size
 			int size = atoi(sizeString);	
 			char words[size];
-			bzero(words,256);
+			bzero(words,prevSize * 16);
+			prevSize = size;
 
 			//read the message inside the socket sent from client
 			n = read(newsockfd,words,size);
@@ -347,13 +340,9 @@ int main(int argc, char *argv[]){
 			}
 
 			//SEND WORDS TO NEW THREAD TO SORT THROUGH
-			/*
-			struct csvFile_arg_struct args;
-			args.dirName = dirName;
-			args.dir = dir;
+			struct sort_arg_struct args;
+			args.file = words;
 			args.colToSort = colToSort;
-			args.counter = counter;
-			*/
 
 
 			//send back the message to client
@@ -367,7 +356,13 @@ int main(int argc, char *argv[]){
 
 	}
 
-
+	//Join all of this thread's children and free the nodes
+	while(firstNode != NULL){
+		pthread_join(*(firstNode->thread), 0);
+		ThreadNode* prev = firstNode;
+		firstNode = firstNode->nextNode;
+		free(prev);
+	}
 
 
 	//When EOF is initiated by client and there are some csv entries given
