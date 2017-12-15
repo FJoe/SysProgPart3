@@ -160,8 +160,10 @@ void *sortIndiv(void* arg){
 		int firstWord = 1;
 		int i = 0;
 
+
 		while(curWord != NULL){
-			printf("sortIndiv: %s\n", curWord);
+			
+			//printf("sortIndiv: %s\n", curWord);
 			if(firstWord)
 				firstWord = 0;
 			else
@@ -226,7 +228,7 @@ void * connectionHandler(void *socket){
 	int newsockfd = *(int *) socket;
 	
 	//Get col to sort by through 
-	char colToSort[30];
+	char colToSort[20];
 	int n;
 
 	n = recv(newsockfd, colToSort, 20, 0);
@@ -306,15 +308,36 @@ void * connectionHandler(void *socket){
 		int size = atoi(sizeString);
 
 		printf("sizenumber: %d\n", size);	
-		char words[size];
+		char words[size + 1000];
 		bzero(words, size);
 
+		ssize_t len;
+		int remain_data = size;
+		char buffer[256];
+
+	
+		while (((len = recv(newsockfd, buffer, 256, 0)) > 0) && (remain_data > 0))
+     		{
+			remain_data -= len;
+			
+			//printf("%s\n", buffer); 
+
+
+			strcat(words, buffer);
+
+			if(strstr(buffer, "/EOF~")){
+				break;
+			}
+     		}
+
+		/*
 		//read the message inside the socket sent from client
 		n = recv(newsockfd, words, size, 0);
 
 		if (n < 0){
 			error("ERROR reading from socket");
 		}
+		*/
 	
 		printf("file: %s\n", words);
 
@@ -323,8 +346,6 @@ void * connectionHandler(void *socket){
 		args.colToSort = colToSort;
 
 		sortIndiv((void *) &args);
-
-		pthread_mutex_unlock(&csv_mutex);
 
 		//send back the message to client
 		n = write(newsockfd,"I got your message",18);
