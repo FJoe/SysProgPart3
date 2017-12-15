@@ -9,4 +9,4 @@ CFLAGS = -Wall -pthread
 all: sorter_server sorter_client
 
 clean:
-@rm sorter_server sorter_client
+	@rm sorter_server sorter_client
