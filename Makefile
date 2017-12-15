@@ -1,5 +1,3 @@
-PROGRAMS = sorter_client
-
 CC = gcc
 CFLAGS = -Wall -pthread
 
@@ -8,7 +6,7 @@ CFLAGS = -Wall -pthread
 
 .PHONY: all clean
 
-all: $(PROGRAMS)
+all: sorter_server sorter_client
 
 clean:
-	@rm -f *.o $(PROGRAMS)
+@rm sorter_server sorter_client

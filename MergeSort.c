@@ -1,13 +1,11 @@
-#include "sorter_thread.h"
+#include "sorter_server.h"
 
 /*
 	The merge function puts the data of 2 temporary arrays back into the main array
-
 	Parameters: 	array - the main array that is to be sorted
 			left - the beginning of the array 
 			mid - the middle of the array
 			right - the end of the array
-
 	The function will create 2 temporary arrays called Left and Right
 	Left compares its value with Right, and depending on the result of the comparison, the main array is matched with the 'lesser' value 
 */
@@ -80,7 +78,6 @@ void merge(DataRow ** array, int left, int mid, int right)
 
 /*
 	Calls MergeSort algorithm on given array. 
-
 	Parameters: 	array - array to be sorted
 			left - beginning of the array to sort
 			right - end of the array to sort

@@ -1,10 +1,3 @@
-/*****
-*
-*	Define structures and function prototypes for your sorter
-*
-*
-*
-******/
 #include<dirent.h>
 #include<netdb.h>
 #include<netinet/in.h>
@@ -12,6 +5,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<sys/mman.h>
 #include<sys/types.h>
 #include<sys/socket.h>
 #include<sys/wait.h>
@@ -49,48 +43,23 @@ struct thread_node{
 
 //arguments for sorting csv file for thread
 struct sort_arg_struct{
-	char* fileDir;
+	char* file;
 	char* colToSort;
-	int colNumToSort;
-};
-
-//arguments for sortcsvFilesHelp 
-struct csvFile_arg_struct{
-	char* dirName;
-	DIR* dir;
-	char* colToSort;
-	int* counter;
 };
 
 //Print error and exit
 void error(char *msg);
 
-//Gets pointer to array of file pointers of type csv files. Also traverses through any directories inside dir
-void sortcsvFiles(char* dir, char* outputDir, char* colToSort, int* counter);
+//Gets dataType of column name
+char getDataType(char* data);
 
-//Helper method to getcsvFiles
-void sortcsvFilesHelp(char* dirName, DIR* dir, char* outputDir, char* colToSort, int* counter);
+//Trims leading and trailing spaces from a string
+char* trimSpace(char* str);
 
 //Gets col number of string in file header (first row of file)
 int getColNum(char* fileDir, char* colToSort);
 
 //sort csv file
 void *sortIndiv(void* arg);
-
-//Trims leading and trailing spaces from a string
-char* trimSpace(char* str);
-
-//Gets dataType of column name
-char getDataType(char* data);
-
-//Suggestion: prototype a mergesort function
-void merge(DataRow ** array, int left, int mid, int right);
-void mergeSort(DataRow ** array, int left, int right);
-
-//Gets dataType of column name
-char getDataType(char* data);
-
-//Formats user input to a standard order of -c <col-to-sort> -d <input file path> -o <output file path>
-char ** readInput(int argc, char* argv[]);
 
 #endif

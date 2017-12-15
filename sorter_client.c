@@ -1,17 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <pthread.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <sys/sendfile.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include "sorter_client.h"
 
 int port;
 char * hostname;
@@ -22,9 +9,7 @@ int ti = 0;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_t * tarr;
 
-typedef struct params{
-    char objectname[500];
-}params;
+
 
 void error(char * msg) {
     perror(msg);
