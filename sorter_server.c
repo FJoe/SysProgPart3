@@ -1,17 +1,358 @@
 /* A simple server in the internet domain using TCP the port number is passed as an argument */
 
 #include"sorter_server.h"
+#include "MergeSort.c"
+
+pthread_mutex_t csv_mutex;
+pthread_mutex_t counter_mutex;
+int* csvCounter;
+int* counter;
+DataRow*** masterList;
+char* header;
+pthread_t * threadPool;
+int threadCounter;
 
 void error(char *msg){
 	perror(msg);
 	exit(1);
 }
 
-int main(int argc, char *argv[]){
-	int sockfd, newsockfd, portno, clilen;
-	char buffer[256];
-	struct sockaddr_in serv_addr, cli_addr;
+char getDataType(char* data){
+	if(strcmp(data, "color") == 0)
+		return 's';
+ 	else if(strcmp(data, "director_name") == 0)
+		return 's'; 
+	else if(strcmp(data, "actor_2_name") == 0)
+		return 's';
+	else if(strcmp(data, "genres") == 0)
+		return 's';
+	else if(strcmp(data, "actor_1_name") == 0)
+		return 's';
+	else if(strcmp(data, "movie_title") == 0)
+		return 's';
+	else if(strcmp(data, "actor_3_name") == 0)
+		return 's';
+	else if(strcmp(data, "plot_keywords") == 0)
+		return 's';
+	else if(strcmp(data, "movie_imdb_link") == 0)
+		return 's';
+	else if(strcmp(data, "language") == 0)
+		return 's';
+	else if(strcmp(data, "country") == 0)
+		return 's';
+	else if(strcmp(data, "content_rating") == 0)
+		return 's';
+
+	if(strcmp(data, "num_critic_for_reviews") == 0)
+		return 'n';
+	else if(strcmp(data, "duration") == 0)
+		return 'n'; 
+	else if(strcmp(data, "director_facebook_likes") == 0)
+		return 'n'; 
+	else if(strcmp(data, "actor_3_facebook_likes") == 0)
+		return 'n';
+	else if(strcmp(data, "actor_1_facebook_likes") == 0)
+		return 'n';
+	else if(strcmp(data, "gross") == 0)
+		return 'n';
+	else if(strcmp(data, "num_voted_users") == 0)
+		return 'n';
+	else if(strcmp(data, "cast_total_facebook_likes") == 0)
+		return 'n';
+	else if(strcmp(data, "facenumber_in_poster") == 0)
+		return 'n';
+	else if(strcmp(data, "num_user_for_reviews") == 0)
+		return 'n';
+	else if(strcmp(data, "budget") == 0)
+		return 'n';
+	else if(strcmp(data, "title_year") == 0)
+		return 'n';
+	else if(strcmp(data, "actor_2_facebook_likes") == 0)
+		return 'n';
+	else if(strcmp(data, "imdb_score") == 0)
+		return 'n';
+	else if(strcmp(data, "aspect_ratio") == 0)
+		return 'n';
+	else if(strcmp(data, "movie_facebook_likes") == 0)
+		return 'n';
+
+	return 'e';	
+}
+
+char* trimSpace(char* str){
+	int end = strlen(str) - 1;
+	while(str[end] == ' ' || str[end] == '\n' || str[end] == '\r')
+	{
+		str[end] = '\0';
+		end--;
+	}
+	while(*str == ' ')
+	{
+		str++;
+	}
+	return str;
+}
+
+
+int getColNum(char* header, char* colToSort){
+	int colNumToSort = 0;
+	const char delim[2] = ",";
+
+	char* row1 = strdup(header);
+	char* row1p = row1;
+
+	char* curHead = strsep(&row1, delim);
+	while( curHead != NULL && strcmp(colToSort, trimSpace(curHead)) != 0){
+		curHead = strsep(&header, delim);
+		colNumToSort++;
+	}
+	free(row1p);
+	if(curHead == NULL){
+		return -1;
+	}
+	return colNumToSort;
+}
+
+void *sortIndiv(void* arg){
+	const char delim[2] = ",";
+	const char delimRow[3] = "\n";
+	const char otherDelim[3] = "\"";
+
+	//Gets arguments
+	struct sort_arg_struct* args = (struct sort_arg_struct*) arg;
+	char* file = args->file;
+	char* colToSort = args->colToSort;
+
+	//Get column heading and create copy of it
+	char* curHeader = strsep(&file, delimRow);
+	if(curHeader == NULL){
+		return NULL;
+	}
+	if(header == NULL){
+		header = strdup(curHeader);
+	}
+
+	//Get col num to sort by
+	int colNumToSort = getColNum(header, colToSort);
+	if(colNumToSort == -1)
+		return NULL;
+
+	//Creating list of DataRow
+	DataRow** list = (DataRow**) malloc(sizeof(DataRow*) * 20000);
+	char dataType = getDataType(colToSort);
+	int curRowNum = 0;
+	
+	char* origRow;
+	//Goes through each row in csv file
+	while((origRow = strsep(&file, delimRow)) != NULL){
+		//New dataRow for array
+		DataRow* newDataRow = (DataRow*) malloc(sizeof(DataRow));
+		newDataRow->dataType = dataType;
+
+		char* origRowDelim = strdup(origRow);
+		char* rowDelim = origRowDelim;
+
+		//newRow is data for new row with trimmed spaces
+		char* newRow = (char*) calloc(1024, sizeof(char));
+
+		//Goes through each word, trimming spaces and finding data to sort by and add data to array
+		char* curWord = strsep(&rowDelim, delim);
+		int firstWord = 1;
+		int i = 0;
+
+		while(curWord != NULL){
+			printf("sortIndiv: %s\n", curWord);
+			if(firstWord)
+				firstWord = 0;
+			else
+				strcat(newRow, ",");
+
+			char* wordToAdd = strdup(curWord);
+			if(strlen(wordToAdd) > 1 && wordToAdd[0] == '"' && wordToAdd[strlen(wordToAdd) - 1] != '"')
+			{
+				char* otherHalf = strsep(&rowDelim, otherDelim);
+				wordToAdd = (char*)realloc(wordToAdd, strlen(wordToAdd) + strlen(",") + strlen(otherHalf) + strlen("\"") + 1);
+				strcat(wordToAdd, ",");
+				strcat(wordToAdd, otherHalf);	
+				strcat(wordToAdd, "\"\0");	
+
+				curWord = strsep(&rowDelim, delim);
+			}
+			char* origPointer = wordToAdd;
+			char* trimWord = trimSpace(origPointer);
+
+			if(i == colNumToSort){
+				DataCompare* newDataCompare = (DataCompare*) malloc(sizeof(DataCompare));
+				if(dataType == 'n'){
+					newDataCompare->numData = atof(trimWord);
+				}
+				else if(dataType == 's'){
+					newDataCompare->stringData = trimWord;
+				}
+				newDataRow->dataCompare = newDataCompare;
+			}
+
+			strcat(newRow, trimWord);
+			curWord = strsep(&rowDelim, delim);
+			free(wordToAdd);
+
+			i++;
+		}
+		free(origRowDelim);
+
+		strcat(newRow, "\n");
+		newDataRow->data = newRow;
+		list[curRowNum] = newDataRow;
+		curRowNum++;
+	}
+
+	//Sort list
+	//mergeSort(list, 0, (curRowNum -1));
+
+	//Ensure no other thread accesses the masterList or csvCounter
+	pthread_mutex_lock(&csv_mutex);
+	if(*csvCounter < 1500){
+		masterList[*csvCounter] = list;
+		*csvCounter += 1;
+	}
+
+	pthread_mutex_unlock(&csv_mutex);
+
+	free(origRow);
+	return NULL;
+}
+
+void * connectionHandler(void *socket){
+	int newsockfd = *(int *) socket;
+	
+	//Get col to sort by through 
+	char colToSort[30];
 	int n;
+
+	n = recv(newsockfd, colToSort, 20, 0);
+	if (n < 0){
+		error("ERROR reading from socket");
+	}
+
+	printf("col to sort: %s\n", colToSort);
+
+	char sizeString[100];;
+
+	n = recv(newsockfd, sizeString, 100, 0);
+	if (n < 0){
+		error("ERROR reading from socket");
+	}
+
+	printf("size of string: %s\n", sizeString);
+
+	//If EOF initiated
+	if(strstr(sizeString, "/EOF~") != NULL){
+
+		//wait for all threads to finish
+		for(; threadCounter >= 0; threadCounter--){
+			pthread_join(threadPool[threadCounter], NULL);
+		}
+
+		//When EOF is initiated by client and there are some csv entries given		
+		if(masterList[0] != NULL){
+			//Create file for sorted csv
+			char* fileName = (char*)malloc(sizeof("AllFiles-sorted-.csv") + sizeof(fileName) + sizeof(colToSort) + 1);
+			strcat(fileName, "AllFiles-sorted-");
+			strcat(fileName, colToSort);
+			strcat(fileName, ".csv");
+			
+			FILE* outfp;
+			outfp = fopen(fileName, "w");
+	
+			//Print header for file
+			fprintf(outfp, header);
+	
+			//Place all data into new list then sort
+			DataRow** sortedList = (DataRow**) malloc(sizeof(DataRow*) * 1000000);
+	
+			int cur = 0;
+			int i = 0;
+			while(masterList[i] != NULL){
+				DataRow** curList = masterList[i];
+				int j = 0;
+				while(curList[j] != NULL){
+					sortedList[cur] = curList[j];
+					j++;
+					cur++;
+				}
+				free(curList);
+				i++;
+			}
+			mergeSort(sortedList, 0, (cur - 1));
+	
+			//Prints sorted list to output file then frees data
+			i = 0;
+			while(sortedList[i] != NULL){
+				fprintf(outfp, sortedList[i]->data);
+	
+				free(sortedList[i]->dataCompare);
+				free(sortedList[i]->data);
+				free(sortedList[i]);
+				i++;
+			}
+			free(sortedList);
+		}
+		else{
+			printf("\nNo valid csv file was found\n");
+		}
+	}
+	else{
+		//get size and convert to int. Make char array of this size
+		int size = atoi(sizeString);
+
+		printf("sizenumber: %d\n", size);	
+		char words[size];
+		bzero(words, size);
+
+		//read the message inside the socket sent from client
+		n = recv(newsockfd, words, size, 0);
+
+		if (n < 0){
+			error("ERROR reading from socket");
+		}
+	
+		printf("file: %s\n", words);
+
+		struct sort_arg_struct args;
+		args.file = words;
+		args.colToSort = colToSort;
+
+		sortIndiv((void *) &args);
+
+		pthread_mutex_unlock(&csv_mutex);
+
+		//send back the message to client
+		n = write(newsockfd,"I got your message",18);
+
+		if (n < 0){
+			error("ERROR writing to socket");
+		}
+	}
+
+	return NULL;
+}
+
+
+
+int main(int argc, char *argv[]){
+	int sockfd, newsockfd, portno;
+	struct sockaddr_in serv_addr, cli_addr;
+	
+	//Initiate pthread_mutex
+	pthread_mutex_init(&counter_mutex, 0);
+	pthread_mutex_init(&csv_mutex, 0);
+
+	//Create masterList of data and csvCounter
+	masterList = (DataRow***) malloc(sizeof(DataRow**) * 1500);
+	csvCounter = (int*) malloc(sizeof(int) * 1);
+
+	//initialize thread pool to 2048 threads
+	threadPool = (pthread_t *) malloc(sizeof(pthread_t) * 2048);
 
 	//check for proper args
 	if (argc < 3){
@@ -60,10 +401,10 @@ int main(int argc, char *argv[]){
 	// This listen() call tells the socket to listen to the incoming connections.
      	// The listen() function places all incoming connection into a backlog queue
      	// until accept() call accepts the connection.
-     	// Here, we set the maximum size for the backlog queue to 5.
-	//TODO: Change value of backlog
-	listen(sockfd,5);
-	clilen = sizeof(cli_addr);
+     	// Here, we set the maximum size for the backlog queue to 32.
+	// Backlog queue shouldn't grow to a large size.
+	listen(sockfd,32);
+	socklen_t clilen = sizeof(cli_addr);
 
 	// This accept() function will write the connecting client's address info 
     	// into the the address structure and the size of that structure is clilen.
@@ -71,30 +412,29 @@ int main(int argc, char *argv[]){
      	// So, the original socket file descriptor can continue to be used 
      	// for accepting new connections while the new socker file descriptor is used for
      	// communicating with the connected client.
-	newsockfd = accept(sockfd,(struct sockaddr *) &cli_addr, &clilen);
+	// If multiple client wants to connect, the server replaces old client with new client and sends back an error
+	
+	//TODO: START THREAD HERE
+	//connect to the client request
+	
+	threadCounter = 0;	
+	while((newsockfd = accept(sockfd,(struct sockaddr *) &cli_addr, &clilen))){
 
-	if (newsockfd < 0){
-		error("ERROR on accept");
-	}
+		printf("accepted\n");
+		if (newsockfd < 0){
+			error("ERROR on accept");
+		}
 
-	//clear buffer
-	bzero(buffer,256);
+		pthread_t thread_id;
+		if(pthread_create(&thread_id, NULL, &connectionHandler , (void *) &newsockfd) < 0){
+			error("error creating thread");
+		}	
 
-	//read the message inside the socket sent from client
-	n = read(newsockfd,buffer,255);
+		threadPool[threadCounter++] = thread_id;
+	}	
 
-	if (n < 0){
-		error("ERROR reading from socket");
-	}
 
-	printf("Here is the message: %s\n",buffer);
 
-	//send back the message to client
-	n = write(newsockfd,"I got your message",18);
-
-	if (n < 0){
-		error("ERROR writing to socket");
-	}
-
+	free(threadPool);
 	return 0;
 }
