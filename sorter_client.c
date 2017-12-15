@@ -1,23 +1,12 @@
-#include <dirent.h>
-#include <fcntl.h>
-#include <sys/sendfile.h>
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-<<<<<<< HEAD
 #include <unistd.h>
 #include <dirent.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-=======
-#include <unistd.h> 
-#include <sys/types.h> 
-#include <sys/socket.h> 
-#include <netinet/in.h> 
->>>>>>> 915d2a17249a32390bef963378a8802558aed5d1
 #include <netdb.h>
 #include <sys/sendfile.h>
 #include <sys/ioctl.h>
@@ -36,7 +25,6 @@ pthread_t * tarr;
 typedef struct params{
     char objectname[500];
 }params;
-
 
 void error(char * msg) {
     perror(msg);
@@ -164,7 +152,6 @@ void recursiveSearch(char* dir){
     return;
 }
 
-<<<<<<< HEAD
 int main(int argc, char * argv[]) {
     int sockfd, n;
     struct sockaddr_in serv_addr;
@@ -327,91 +314,6 @@ int sendCSV(char * filename)
                 remain_data -= sent_bytes;
                 printf("2. Client sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
         }*/
-=======
-	//clears the memory and initializes to 0s
-        bzero((char * ) & serv_addr, sizeof(serv_addr));
-	
-	//set domain 
-        serv_addr.sin_family = AF_INET;
-
-	//copy the bytesequency from src to destination 
-        bcopy((char * ) server -> h_addr, (char * ) & serv_addr.sin_addr.s_addr, server -> h_length);
-
-	//assign portno
-        serv_addr.sin_port = htons(portno);
-
-        if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-                error("ERROR connecting");
-        }
-	
-	int cont;
-	do{
-		char fileName[100];
-    		struct stat st;
-
-		printf("Please enter csv file location: ");
-
-		//Sets given file location to fileName
-		bzero(fileName, 256);
-		fgets(fileName, 255, stdin);
-
-		
-
-		//Clears any \n within fileName
-		int i;
-		for(i = 0; i < 100; i++)
-			if(fileName[i] == '\n')
-				fileName[i] = '\0';
-
-		if(strstr(fileName, "/EOS~") != NULL){
-			cont = 0;
-		}
-		else{
-			//Open file, return error if any
-			int fq = open(fileName, O_RDONLY);
-			if( fq < 0 )
-			{
-				perror("File error");
-				exit(1);
-			}
-	    
-			//Get length of file and convert int to string
-			stat(fileName,&st);
-			int len = st.st_size;
-			char bufferSize[10];
-			sprintf(bufferSize, "%d", len);
-
-			//Send length of file to server, return error if any
-			n = write(sockfd, bufferSize, strlen(bufferSize));
-			if(n < 0){
-				error("ERROR writing to socket");
-			}
-
-			if(sendfile(sockfd,fq,0,len) < 0)
-			{
-				perror("send error");
-				exit(1);
-			}
-
-			//Just always continue the while loop for this test
-			cont = 1;
-
-			//clean the string
-			bzero(buffer, 256);
-
-			//read response of the server
-			n = read(sockfd, buffer, 255);
-			if (n < 0) {
-				error("ERROR reading from socket");
-			}
-			printf("%s\n", buffer);
-		}
-
-		
-
-	}while(cont);
-
->>>>>>> 915d2a17249a32390bef963378a8802558aed5d1
 
     write(sd, "Finished! (EOF)\n", 256);
     bzero(buffer, 256);
